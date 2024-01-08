@@ -3,8 +3,7 @@ import streamlit as st
 from streamlit_chat import message
 
 def get_completion(prompt):
-    splatoon = st.text_input(label="openAI API key", placeholder="Enter your API key here", value="", type="password")
-    client = OpenAI(api_key=splatoon)
+    client = OpenAI(api_key=st.text_input(label="openAI API key", placeholder="Enter your API key here", value="", type="password"))
 
     response = client.chat.completions.create(
         model="gpt-3.5-turbo",
