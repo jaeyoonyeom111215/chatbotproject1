@@ -9,6 +9,7 @@ st.subheader(title)
     
 user_input = st.text_input("의견을 입력하세요.")
 if st.button("submit"):
-    st.text_input("의견이 전송되었습니다.")
+    st.header("의견이 전송되었습니다.")
     time.sleep(1)
-    st.text_input("")
+    del st.text_input("")
+    del st.header("의견이 전송되었습니다.")
