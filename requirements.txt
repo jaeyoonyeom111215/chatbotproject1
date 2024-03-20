@@ -38,7 +38,6 @@ pytz==2023.3.post1
 referencing==0.32.1
 requests==2.31.0
 rich==13.7.0
-st-gsheets-connection
 rpds-py==0.16.2
 six==1.16.0
 smmap==5.0.1
