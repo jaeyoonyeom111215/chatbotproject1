@@ -1,33 +1,46 @@
 import streamlit as st
-from google.cloud import firestore
+from transformers import VisionEncoderDecoderModel, ViTFeatureExtractor, AutoTokenizer
+from PIL import Image
+import cv2
+import torch
 
-db = firestore.Client.from_service_account_json("streamlit-reddit-e1aba-firebase-adminsdk-1lcvf-10fc77da33.json")
+# 모델 및 토크나이저 로드
+model = VisionEncoderDecoderModel.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
+feature_extractor = ViTFeatureExtractor.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
+tokenizer = AutoTokenizer.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model.to(device)
 
-title = "의견이 전송되었습니다."
+def main():
+    st.title("Webcam Image Captioning and Chat")
 
-st.header("1-7 학급 소통함")
+    # 대화 내용을 저장할 리스트
+    conversation = []
 
-input_text = st.text_input("text", key="text")    
+    cap = cv2.VideoCapture(0)
 
-st.write(input_text)
+    if st.button("Capture Image"):
+        ret, frame = cap.read()
 
-if st.button("submit"):
+        image = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
 
-    doc_ref = db.collection("posts").document(title)
-    doc_ref.set({
-        "title": title,
-        "url": input_text
-    })
+        pixel_values = feature_extractor(images=image, return_tensors="pt").pixel_values
+        pixel_values = pixel_values.to(device)
+        output_ids = model.generate(pixel_values, max_length=50, num_beams=4, early_stopping=True)
+        caption = tokenizer.decode(output_ids[0], skip_special_tokens=True)
 
-    st.session_state["text"] = ""
-    st.text_input("text", key="text", value="")
+        # 캡션을 대화 리스트에 추가
+        conversation.append({"user": "User", "message": "Captured Image"})
+        conversation.append({"user": "Model", "message": caption})
 
-posts_ref = db.collection("posts")
-st.header(title)
+        st.image(frame, caption=caption, use_column_width=True)
 
-try:
-    for doc in posts_ref.stream():
-        post = doc.to_dict()
+    # 대화 내용을 출력
+    for conv in conversation:
+        st.text(f"{conv['user']}: {conv['message']}")
 
-except Exception as e:
-    st.error("Firestore에서 문서를 가져오는 중 오류가 발생했습니다: {}".format(str(e)))
+    cap.release()
+
+if __name__ == "__main__":
+    main()
+
