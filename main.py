@@ -1,46 +1,37 @@
 import streamlit as st
-from transformers import VisionEncoderDecoderModel, ViTFeatureExtractor, AutoTokenizer
-from PIL import Image
+from transformers import AutoModelForCausalLM, AutoTokenizer
 import cv2
-import torch
+from PIL import Image
+import numpy as np
 
-# 모델 및 토크나이저 로드
-model = VisionEncoderDecoderModel.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
-feature_extractor = ViTFeatureExtractor.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
-tokenizer = AutoTokenizer.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model.to(device)
+# 웹캠 액세스
+cam = cv2.VideoCapture(0)
 
-def main():
-    st.title("Webcam Image Captioning and Chat")
+# 이미지 캡처 버튼
+capture_image = st.button("Capture Image")
 
-    # 대화 내용을 저장할 리스트
-    conversation = []
+# 캡처된 이미지 저장
+if capture_image:
+    ret, img = cam.read()
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    st.image(img, channels="RGB")
+    pil_img = Image.fromarray(img)
+    
+    model_id = "vikhyatk/moondream2"
+    revision = "2024-03-06"
+    
+    model = AutoModelForCausalLM.from_pretrained(model_id, trust_remote_code=True, revision=revision)
+    tokenizer = AutoTokenizer.from_pretrained(model_id, revision=revision)
+    
+    # 사용자 질문 입력
+    user_question = st.text_input("Enter your question here:")
+    
+    if user_question:
+        enc_image = model.encode_image(pil_img)
+        result = model.answer_question(enc_image, user_question, tokenizer)
+        st.write(f"Answer: {result}")
 
-    cap = cv2.VideoCapture(0)
-
-    if st.button("Capture Image"):
-        ret, frame = cap.read()
-
-        image = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-
-        pixel_values = feature_extractor(images=image, return_tensors="pt").pixel_values
-        pixel_values = pixel_values.to(device)
-        output_ids = model.generate(pixel_values, max_length=50, num_beams=4, early_stopping=True)
-        caption = tokenizer.decode(output_ids[0], skip_special_tokens=True)
-
-        # 캡션을 대화 리스트에 추가
-        conversation.append({"user": "User", "message": "Captured Image"})
-        conversation.append({"user": "Model", "message": caption})
-
-        st.image(frame, caption=caption, use_column_width=True)
-
-    # 대화 내용을 출력
-    for conv in conversation:
-        st.text(f"{conv['user']}: {conv['message']}")
-
-    cap.release()
-
-if __name__ == "__main__":
-    main()
+# 웹캠 해제
+cam.release()
+cv2.destroyAllWindows()
 
